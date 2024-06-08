@@ -1,5 +1,8 @@
 #!/bin/bash
 #FLUSH ALL
+# Ne pas oublier de nano /etc/sysctl.conf ip_forward =1
+# chmod +x table.sh
+# ./table.sh
 iptables -F INPUT
 iptables -F OUTPUT
 iptables -F FORWARD
@@ -14,16 +17,20 @@ iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -j ACCEPT -p icmp
 iptables -A INPUT -p tcp -s 10.1.41.10 -i enp0s3 --dport 22 -j ACCEPT
+#Connection SSH au pare feu depuis client ext
 #Bloquer le reste
 -iptables -A INPUT -j REJECT
 ### FORWARD RULES ###
 #Règles FORWARD
 iptables -A FORWARD -m conntrack  --ctstate ESTABLISHED,RELATED -J ACCEPT
-iptables -A FORWARD -s 192.168.1.0/24 -i enp0s8 -o enp0s3 -j ACCEPT -p udp --dport 53
-iptables -A FORWARD -s 192.168.1.0/24 -i enp0s8 -o enp0s3 -j ACCEPT -p tcp --dport 443
+iptables -A FORWARD -s 192.168.1.0/24 -i enp0s8 -o enp0s3 -j ACCEPT -p udp --dport 53 #DNS depuis LAN vers Ext
+iptables -A FORWARD -s 192.168.1.0/24 -i enp0s8 -o enp0s3 -j ACCEPT -p tcp --dport 443 #HTTPS depuis LAN vers Ext
 iptables -A FORWARD -s 192.168.1.0/24 -d 172.16.0.0/16 -i enp0s8 -o enp0s9 -j ACCEPT -p tcp --match multiport --dport 21,80
+#Accès LAN vers FTP et au site Web (FTP 21 et HTTP 80)
 iptables -A FORWARD -i enp0s3 -p tcp -d 172.16.0.10 --dport 80 -j ACCEPT
+# Pour la règle site web internet prerouting
 iptables -A FORWARD -i enp0s3 -p tcp -d 172.16.0.10 --dport 22 -j ACCEPT
+# pour la règle client externe accès à la DMZ en SSH
 #Bloquer le reste
 iptables -A FORWARD -j REJECT
 ### OUTPUT RULES ###
@@ -36,9 +43,11 @@ iptables -A OUTPUT -j REJECT
 ######################
 ###Dnat###
 #Règles de dnat
-iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o enp0s3 -j MASQUERADE
-iptables -t nat -L
+iptables -t nat -A PREROUTING -p tcp --dst 10.1.41.11 --dport 80 -j DNAT --to-destination 172.16.0.10:80
+#Accès au site web depuis internet avec l'ip du pare feu
+iptables -t nat -A PREROUTING -p tcp --dst 10.1.41.11 --dport 61337 -j DNAT --to-destination 172.16.0.10:22
+# pour la règle client externe accès à la DMZ en SSH sur le port 61337
 ###Snat###
 #Règles de snat
-iptables -t nat -A PREROUTING -p tcp --dst 10.1.41.11 --dport 80 -j DNAT --to-destination 172.16.0.10:80
-iptables -t nat -A PREROUTING -p tcp --dst 10.1.41.11 --dport 61337 -j DNAT --to-destination 172.16.0.10:22
+iptables -t nat -A POSTROUTING  -o enp0s3 -j MASQUERADE 
+iptables -t nat -L #Vérification
