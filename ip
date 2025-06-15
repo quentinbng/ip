@@ -16,7 +16,7 @@ iptables -A INPUT -j ACCEPT -p icmp
 iptables -A INPUT -p tcp -s 10.1.41.10 -i enp0s3 --dport 22 -j ACCEPT
 #Connection SSH au pare feu depuis client ext
 #Bloquer le reste
--iptables -A INPUT -j REJECT
+iptables -A INPUT -j REJECT
 ### FORWARD RULES ###
 #Règles FORWARD
 iptables -A FORWARD -m conntrack  --ctstate ESTABLISHED,RELATED -J ACCEPT
